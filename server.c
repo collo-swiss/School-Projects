@@ -1,0 +1,107 @@
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#define port 21505
+
+int order;
+float calc_determinant(float matrix[order][order], int order);
+float cofactor(float matrix[order][order], float ab[order][order], int rw, int cl, int ord);
+int main()
+{
+	int mySocket, cSocket;
+	int a, b, count;
+	float det;
+	//char buffer[1024];
+	int *buffer;
+	struct sockaddr_in serverAddr;
+	struct sockaddr_storage serverStorage;
+	socklen_t addr_size;
+
+	mySocket = socket(PF_INET, SOCK_STREAM, 0);
+	serverAddr.sin_family = AF_INET;
+
+	serverAddr.sin_port = htons(port);
+	serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+	bind(mySocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
+	for(;;)
+	{
+		if(listen(mySocket, 5)==0)
+		printf("Listening on port: %d\n", port);
+		else
+			printf("Error\n");
+
+		addr_size = sizeof serverStorage;
+		cSocket = accept(mySocket, (struct sockaddr *) &serverStorage, &addr_size);
+
+
+		count = read(cSocket, &order, sizeof(order));
+		float matrix[order][order];
+		count = read(cSocket, matrix, sizeof(matrix));
+		if(count > 0){
+			printf("The matrix you received is: \n");
+			for(a=0; a<order; a++){
+				for(b=0; b<order; b++){
+					printf("%.2f \t", matrix[a][b]);
+				}
+				printf("\n");
+			}
+		}
+		else{
+			printf("There was an error receiveing data from the client!!\n");
+		}
+		// else if(order == 2){
+		// 	det = (matrix[0][0]*matrix[1][1]) - (matrix[0][1]*matrix[1][0]);
+		// 	write(cSocket, det, sizeof(det));
+		// 	printf("The determinant of the matrix is: %d \n", det);
+		// }
+		det = calc_determinant(matrix, order);
+		printf("The determinant is: %.2f \n", det);
+		write(cSocket, &det, sizeof(det));
+
+		close(cSocket);
+		
+	}
+	return 0;
+	
+}
+float cofactor(float matrix[order][order], float ab[order][order], int rw, int cl, int ord)
+{
+	int a = 0, b = 0, row, col;
+
+	for(row=0; row<ord; row++){
+		for(col=0; col<ord; col++){
+			if(row != rw && col != cl){
+				ab[a][b++] = matrix[row][col];
+
+				if(b == ord-1){
+					b = 0;
+					a++;
+				}
+			}
+		}
+	}
+}
+
+float calc_determinant(float matrix[order][order], int order)
+{
+	float det = 0;
+	int c;
+
+	if(order == 1){
+		return matrix[0][0];
+	}
+
+	float ab[order-1][order-1];
+	int sign = 1;
+
+	for(c=0; c<order; c++){
+		cofactor(matrix, ab, 0, c, order);
+		det += sign * matrix[0][c] * calc_determinant(ab, order-1);
+
+		sign = -sign;
+	}
+	return det;
+
+}
